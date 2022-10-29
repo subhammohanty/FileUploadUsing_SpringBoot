@@ -1,13 +1,16 @@
 package com.javatechie.spring.batch.config;
 
 import com.javatechie.spring.batch.entity.Customer;
+import com.javatechie.spring.batch.listner.StepSkipListener;
 import com.javatechie.spring.batch.repository.CustomerRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.batch.core.Job;
+import org.springframework.batch.core.SkipListener;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
+import org.springframework.batch.core.step.skip.SkipPolicy;
 import org.springframework.batch.item.data.RepositoryItemWriter;
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.LineMapper;
@@ -48,7 +51,7 @@ public class SpringBatchConfig {
         DelimitedLineTokenizer lineTokenizer = new DelimitedLineTokenizer();
         lineTokenizer.setDelimiter(",");
         lineTokenizer.setStrict(false);
-        lineTokenizer.setNames("id", "firstName", "lastName", "email", "gender", "contactNo", "country", "dob");
+        lineTokenizer.setNames("id", "firstName", "lastName", "email", "gender", "contactNo", "country", "dob" , "age");
 
         BeanWrapperFieldSetMapper<Customer> fieldSetMapper = new BeanWrapperFieldSetMapper<>();
         fieldSetMapper.setTargetType(Customer.class);
@@ -73,11 +76,16 @@ public class SpringBatchConfig {
 
     @Bean
     public Step step1(){
-        return stepBuilderFactory.get("csv-step").<Customer , Customer>chunk(10)
+        return stepBuilderFactory.get("slaveStep").<Customer , Customer>chunk(10)
                 .reader(reader())
                 .processor(processor())
                 .writer(writer())
-                .taskExecutor(taskExecutor())
+                .faultTolerant()
+//                .skipLimit(1000)
+//                .skip(NumberFormatException.class)
+                .listener(skipListener())
+                .skipPolicy(skipPolicy())
+                .taskExecutor(taskExecutor()) //To run Asynchronously
                 .build();
     }
 
@@ -93,6 +101,16 @@ public class SpringBatchConfig {
         SimpleAsyncTaskExecutor asyncTaskExecutor = new SimpleAsyncTaskExecutor();
         asyncTaskExecutor.setConcurrencyLimit(10);
         return asyncTaskExecutor;
+    }
+
+    @Bean
+    public SkipPolicy skipPolicy(){
+        return new ExceptionSkipPolicy();
+    }
+
+    @Bean
+    public SkipListener skipListener(){
+        return new StepSkipListener();
     }
 
 }
