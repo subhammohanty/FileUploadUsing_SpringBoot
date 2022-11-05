@@ -1,0 +1,5 @@
+com\javatechie\entity\Product.class
+com\javatechie\controller\ProductController.class
+com\javatechie\service\ProductService.class
+com\javatechie\JpaDemoApplication.class
+com\javatechie\repository\ProductRepository.class
