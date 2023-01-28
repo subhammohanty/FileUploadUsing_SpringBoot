@@ -10,6 +10,7 @@ import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
+import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.step.skip.SkipPolicy;
 import org.springframework.batch.item.data.RepositoryItemWriter;
 import org.springframework.batch.item.file.FlatFileItemReader;
@@ -17,11 +18,14 @@ import org.springframework.batch.item.file.LineMapper;
 import org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;
 import org.springframework.batch.item.file.mapping.DefaultLineMapper;
 import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
+
+import java.io.File;
 
 @Configuration
 @EnableBatchProcessing
@@ -36,14 +40,27 @@ public class SpringBatchConfig {
 
 
     @Bean
-    public FlatFileItemReader<Customer> reader(){
+    @StepScope // By default @Bean is Singleton to instanciate at every execution we annotate with @StepScope
+    public FlatFileItemReader<Customer> reader(@Value("#{jobParameters[filePath]}") String pathToImport){
         FlatFileItemReader<Customer> itemReader = new FlatFileItemReader<>();
-        itemReader.setResource(new FileSystemResource("src/main/resources/customers.csv"));
+        itemReader.setResource(new FileSystemResource(new File(pathToImport)));
         itemReader.setName("csvReader");
         itemReader.setLinesToSkip(1);
         itemReader.setLineMapper(lineMapper());
         return itemReader;
     }
+
+    //Old Implementation of static file read from location
+//    @Bean
+//    public FlatFileItemReader<Customer> reader(){
+//        FlatFileItemReader<Customer> itemReader = new FlatFileItemReader<>();
+//        itemReader.setResource(new FileSystemResource("src/.../..."));
+//        itemReader.setName("csvReader");
+//        itemReader.setLinesToSkip(1);
+//        itemReader.setLineMapper(lineMapper());
+//        return itemReader;
+//    }
+
 
     private LineMapper<Customer> lineMapper() {
         DefaultLineMapper<Customer> lineMapper = new DefaultLineMapper();
@@ -75,9 +92,9 @@ public class SpringBatchConfig {
     }
 
     @Bean
-    public Step step1(){
+    public Step step1(FlatFileItemReader<Customer> reader){
         return stepBuilderFactory.get("slaveStep").<Customer , Customer>chunk(10)
-                .reader(reader())
+                .reader(reader)
                 .processor(processor())
                 .writer(writer())
                 .faultTolerant()
@@ -90,9 +107,9 @@ public class SpringBatchConfig {
     }
 
     @Bean
-    public Job runJob(){
+    public Job runJob(FlatFileItemReader<Customer> reader){
         return jobBuilderFactory.get("importCustomers")
-                .flow(step1())
+                .flow(step1(reader))
                 .end().build();
     }
 
